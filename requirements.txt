@@ -150,7 +150,7 @@ parso==0.8.4
 partial-json-parser==0.2.1.1.post5
 peft==0.14.0
 pexpect==4.9.0
-pillow==11.2.1
+pillow==11.3.0
 platformdirs==4.3.6
 pre-commit==4.2.0
 prometheus-client==0.21.1
