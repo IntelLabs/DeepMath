@@ -220,6 +220,20 @@ python evaluation.py \
 
 See `example.sh` for complete command examples with all parameters.
 
+## Citation
+
+If you use DeepMath in your research, please cite:
+
+```bibtex
+@software{deepmath2025,
+  author = {Fleischer, Daniel and Berchansky, Moshe and Wasserblat, Moshe},
+  title = {DeepMath: A Lightweight Math Reasoning Agent for LLMs},
+  year = {2025},
+  publisher = {Intel AI Labs},
+  url = {https://github.com/IntelLabs/DeepMath}
+}
+```
+
 ## Limitations & Future Work
 
 - **Scope**: we focused on a small model and on mathematical reasoning.
