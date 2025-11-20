@@ -234,7 +234,7 @@ websocket-client==1.8.0
 websockets==15.0.1
 wrapt==1.17.2
 xformers==0.0.29.post2
-xgrammar==0.1.17
+xgrammar==0.1.21
 xxhash==3.5.0
 yarl==1.20.0
 zipp==3.21.0
