@@ -198,7 +198,7 @@ smmap==5.0.2
 sniffio==1.3.1
 soupsieve==2.6
 stack-data==0.6.3
-starlette==0.46.2
+starlette==0.49.1
 submitit==1.5.3
 sympy==1.13.1
 terminado==0.18.1
