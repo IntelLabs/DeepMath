@@ -1,0 +1,32 @@
+# @package _global_
+model:
+    _target_: deep_math.models.HFInference
+    model_name_or_path: Qwen/Qwen3-4B-Thinking-2507
+    load_in_4bit: false
+    load_in_8bit: true
+    attn_implementation: flash_attention_2
+    device_map: auto
+    torch_dtype:
+    trust_remote_code: true
+    instruction:
+    template: deep_seek_math
+    template_map:
+        question: problem
+    lora_path:
+    examples:
+    sampling: 1
+    generation:
+        do_sample: false
+        max_new_tokens: 1000
+        max_length:
+        temperature:
+        top_k:
+        top_p:
+        repetition_penalty:
+        return_full_text: false
+
+hf_tag: fastragdev/math500_test
+generated_file: baseline-r1-qwen-1.5.jsonl
+generation_key: output
+target_key: answer
+limit:

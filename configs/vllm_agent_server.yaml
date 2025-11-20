@@ -1,0 +1,4 @@
+enable_prefix_caching: true
+host: localhost
+max_model_len: 20000
+

@@ -1,0 +1,17 @@
+# @package _global_
+answer_processor:
+
+metrics:
+    - _target_: deep_math.metrics.OutputLength
+      model: Qwen/Qwen3-4B-Thinking-2507
+    - _target_: deep_math.metrics.MathVerify
+      aggregation: majority
+
+key_names:
+    generated: text
+    cleaned: final_answer
+    label: target
+
+generated_file:
+results_file:
+limit:

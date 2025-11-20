@@ -1,0 +1,29 @@
+# @package hydra.launcher
+_target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
+account: null
+additional_parameters:
+array_parallelism: 256
+comment: null
+constraint: ampere
+cpus_per_gpu: null
+cpus_per_task: 14
+exclude: null
+gpus_per_node: null
+gpus_per_task: null
+gres: gpu:1
+max_num_timeout: 0
+mem_gb: null
+mem_per_cpu: null
+mem_per_gpu: null
+name: ${hydra.job.name}
+nodes: 1
+partition: g48
+qos: normal
+setup:
+  - cd /PATH/TO/PROJECT
+  - source .venv/bin/activate
+signal_delay_s: 120
+srun_args: null
+submitit_folder: ${hydra.sweep.dir}/slurm-%j
+tasks_per_node: 1
+timeout_min: 2880

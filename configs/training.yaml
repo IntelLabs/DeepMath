@@ -1,0 +1,96 @@
+# @package _global_
+model:
+  _target_: deep_math.models.HFTrain
+  model_name_or_path: Qwen/Qwen3-4B-Thinking-2507
+  load_in_4bit: false
+  load_in_8bit: false
+  torch_dtype: bfloat16
+  device_map: auto
+  attn_implementation: flash_attention_2
+  trust_remote_code: true
+  lora:
+    bias: none
+    fan_in_fan_out: false
+    layers_pattern:
+    layers_to_transform:
+    lora_alpha: 16
+    lora_dropout: 0.1
+    peft_type: LORA
+    r: 32
+    target_modules: "all-linear"
+    task_type: CAUSAL_LM
+    use_rslora: true
+
+train:
+  num_generations: 4 # GRPO parameters, divisable by the global batch size = batch x accumulation x gpus
+  max_completion_length: 3000
+  use_vllm: true
+  vllm_server_host: localhost
+  bf16: true
+  eval_steps: 50
+  eval_strategy: "no"
+  eval_on_start: false
+  fp16: false
+  gradient_accumulation_steps: 2
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  group_by_length:
+  learning_rate: 1e-6
+  logging_steps: 1
+  log_completions: true
+  lr_scheduler_type: cosine
+  max_steps: -1
+  max_prompt_length: 2048
+  num_train_epochs: 1
+  optim: adamw_torch_fused
+  output_dir: /projects/deepmath/models/qwen3-4b-agent/
+  per_device_eval_batch_size: 4
+  per_device_train_batch_size: 4
+  remove_unused_columns: false
+  report_to: wandb
+  save_steps: 20
+  save_total_limit: 500
+  warmup_ratio: 0.1
+  weight_decay: 0.001
+  # GRPO config
+  # temperature: 0.6       # NOTE: We are using temperature scheduling
+  top_p: 0.8
+  top_k: 50
+  epsilon_high: 0.4
+  # These update the ref model (moving average) in order for the KL not to overwhelm the loss
+  sync_ref_model: true
+  ref_model_mixup_alpha: 0.4
+  ref_model_sync_steps: 300
+
+data_file: fastragdev/openmathreasoning-tir
+input_key: problem
+output_key: answer
+resume: false
+dev_split: 150
+seed: 42
+template: simple_template
+use_agent: true # NOTE: this just adds a system prompt with fewshot examples
+max_agent_steps: 50 # New parameter, to be matched with the agent
+max_agent_output: 5000 # should be equal to train.max_completion_length for predictable behavior
+system_instruction: agent_math_instruction
+fewshot_examples: deep_math/fewshot.txt
+reward_funcs:
+  - open_r1_accuracy
+  - code_format
+lead_alpha:
+reward_weights:
+  - 0.1
+  - 1.0
+temp_scheduling:
+  temp_a_step: 0
+  temp_a: 1.2
+  temp_b_step: 1000
+  temp_b: 0.7
+limit:
+shuffle:
+use_wandb: true
+hfhub_tag:
+experiment: qwen3-4B-agent7.1
+project: deepmath
+wandb_entity:
