@@ -6,6 +6,7 @@
 
 Large language models (LLMs) have made impressive strides in reasoning tasks, yet mathematical problem-solving remains a challenge. Traditional "chain-of-thought" reasoning often produces verbose explanations and error-prone arithmetic. **DeepMath** tackles this by combining a small Python executor with a fine-tuned LLM, enabling concise, computation-driven reasoning.
 
+
 ## DeepMath
 
 DeepMath is built on **Qwen3-4B Thinking** and fine-tuned with **GRPO (Group Relative Policy Optimization)**. Instead of verbose text, the model emits **tiny Python snippets** for intermediate steps, runs them in a secure sandbox, and folds the results back into its reasoning, reducing errors and output length.
@@ -22,6 +23,7 @@ We evaluate DeepMath on four math datasets: **MATH500, AIME, HMMT, and HLE,** an
 
 - Combining the agent with GRPO yields the largest gains.
 
+🔗 Blog: https://huggingface.co/blog/intel-deepmath \
 👉 Model: <https://huggingface.co/Intel/deepmath-v1>
 
 ## Why DeepMath?
