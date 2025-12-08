@@ -23,8 +23,11 @@ We evaluate DeepMath on four math datasets: **MATH500, AIME, HMMT, and HLE,** an
 
 - Combining the agent with GRPO yields the largest gains.
 
-🔗 Blog: https://huggingface.co/blog/intel-deepmath \
-👉 Model: <https://huggingface.co/Intel/deepmath-v1>
+Check out:
+
+- 🔗 Blog: https://huggingface.co/blog/intel-deepmath 
+
+- 👉 Model: <https://huggingface.co/Intel/deepmath-v1>
 
 ## Why DeepMath?
 
