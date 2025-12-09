@@ -46,10 +46,12 @@ DeepMath implements both. The model learns to generate short Python snippets, wh
 - Inference: based on [SmolAgents](https://github.com/huggingface/smolagents/), a math agent was created. vLLM is used as the inference engine.
 - Training: based on the GRPO trainer in [TRL](https://github.com/huggingface/trl), we modified TRL's vLLM client and server to generate GRPO completions using our DeepMath agent.
 
+<div align="center">
 <figure>
 <img src="assets/trl-grpo-vllm-deepmath.png" style="width:400" alt="Changes to vLLM client and server in TRL library." />
 <figcaption><p>Figure 1: The vLLM client and server were modified to use the DeepMath agent in generating the candidates, while using the vLLM backend.</p></figcaption>
 </figure>
+</div>
 
 - **Agent Interface:** During inference, the model can output normal tokens or special agent calls containing Python snippets.
 
@@ -63,10 +65,12 @@ DeepMath implements both. The model learns to generate short Python snippets, wh
 
   - **Interpretability:** Snippets are readable and auditable.
 
+<div align="center">
 <figure>
 <img src="assets/output-example.png" style="width:700" alt="Output example: it contains a short python snippet as well as its output which is used in the reasoning process." />
 <figcaption><p>Figure 2: Output example where python code is generated, evaluated and the answer is inserted into the trace and used for context.</p></figcaption>
 </figure>
+</div>
 
 ## Training with GRPO
 
@@ -92,7 +96,9 @@ We benchmarked DeepMath against baselines on four datasets. Metrics include:
 
 - **Mean output length** (brevity).
 
+<div align="center">
 <img src="assets/main-results.png" style="width:800" alt="Main results table."/>
+</div>
 
 **Key Insight:** DeepMath reduces output length by up to **66%** while improving accuracy on challenging datasets.
 
