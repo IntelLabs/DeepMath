@@ -46,10 +46,11 @@ DeepMath implements both. The model learns to generate short Python snippets, wh
 - Inference: based on [SmolAgents](https://github.com/huggingface/smolagents/), a math agent was created. vLLM is used as the inference engine.
 - Training: based on the GRPO trainer in [TRL](https://github.com/huggingface/trl), we modified TRL's vLLM client and server to generate GRPO completions using our DeepMath agent.
 
-<figure>
-<img src="assets/trl-grpo-vllm-deepmath.png" style="width:400" alt="Changes to vLLM client and server in TRL library." />
-<figcaption><p>Figure 1: The vLLM client and server were modified to use the DeepMath agent in generating the candidates, while using the vLLM backend.</p></figcaption>
-</figure>
+<div align="center">
+<img src="assets/trl-grpo-vllm-deepmath.png" width=600 alt="Changes to vLLM client and server in TRL library." />
+</div><br>
+<em>Figure 1: The vLLM client and server were modified to use the DeepMath agent in generating the candidates, while using the vLLM backend.</em>
+
 
 - **Agent Interface:** During inference, the model can output normal tokens or special agent calls containing Python snippets.
 
@@ -63,10 +64,9 @@ DeepMath implements both. The model learns to generate short Python snippets, wh
 
   - **Interpretability:** Snippets are readable and auditable.
 
-<figure>
-<img src="assets/output-example.png" style="width:700" alt="Output example: it contains a short python snippet as well as its output which is used in the reasoning process." />
-<figcaption><p>Figure 2: Output example where python code is generated, evaluated and the answer is inserted into the trace and used for context.</p></figcaption>
-</figure>
+<div align="center">
+<img src="assets/output-example.png" width=800 alt="Output example: it contains a short python snippet as well as its output which is used in the reasoning process." /><br></div>
+<em>Figure 2: Output example where python code is generated, evaluated and the answer is inserted into the trace and used for context.</em>
 
 ## Training with GRPO
 
@@ -92,7 +92,13 @@ We benchmarked DeepMath against baselines on four datasets. Metrics include:
 
 - **Mean output length** (brevity).
 
+<div align="center">
 <img src="assets/main-results.png" style="width:800" alt="Main results table."/>
+</div>
+
+- We compare a baseline configuration ([Qwen3-4B-Thinking-2507](https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507), no agenting) with our DeepMath model. As ablation, we evaluate the agentic framework we developed running with the untrained Qwen3 model, denoted by **+Agent**. Additionally, we examine whether the GRPO training (for agentic use) improves non-agentic inference, denoted by **+GRPO**. Thus the two ablations are independent, not additive.
+
+- We observe the agentic inference reduces output lengths, with mixed accuracy results. The DeepMath model is both GRPO-trained and run in agentic mode, and shows the highest accuracy with shortened traces. We conclude **both GRPO training and agentic inference are needed** for best results.
 
 **Key Insight:** DeepMath reduces output length by up to **66%** while improving accuracy on challenging datasets.
 
