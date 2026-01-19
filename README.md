@@ -25,7 +25,7 @@ We evaluate DeepMath on four math datasets: **MATH500, AIME, HMMT, and HLE,** an
 
 Check out:
 
-- 🔗 Blog: https://huggingface.co/blog/intel-deepmath 
+- 🔗 Blog: https://huggingface.co/blog/intel-deepmath
 
 - 👉 Model: <https://huggingface.co/Intel/deepmath-v1>
 
