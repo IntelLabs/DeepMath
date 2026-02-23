@@ -15,4 +15,4 @@ submitit
 tiktoken==0.9.0
 transformers==4.51.3
 trl==0.17.0
-vllm==0.8.4
+vllm==0.14.1
