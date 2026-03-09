@@ -10,7 +10,7 @@ omegaconf==2.3.0
 openai==1.76.0
 peft==0.15.2
 regex==2024.11.6
-smolagents==1.15.0
+smolagents==1.22.0
 submitit
 tiktoken==0.9.0
 transformers==4.51.3
