@@ -1,0 +1,30 @@
+name: Restricted math execution
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install CPU-only regression dependencies
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install sympy==1.14.0 smolagents==1.26.0 transformers==5.10.4
+          python -m pip check
+      - name: Test real Linux worker limits and agent integration
+        run: python -B -m unittest discover -s tests -v
