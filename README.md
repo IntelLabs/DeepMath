@@ -116,31 +116,62 @@ DeepMath demonstrates a practical and lightweight way to combine a small executo
 
 ## Try It Yourself
 
-Check out the GitHub repo and share your feedback! Contributions welcome. 🚀
+Check out the GitHub repository and give DeepMath a try. Feedback and contributions are welcome. 🚀
 
 ## Installation
 
-DeepMath uses [uv](https://github.com/astral-sh/uv):
+DeepMath uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management.
 
-1. **Install uv** (if not already installed):
+### 1. Install uv
+
+If `uv` is not already installed:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-2. **Clone the repository**:
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/intellabs/DeepMath.git
 cd DeepMath
 ```
 
-3. **Install dependencies**:
+### 3. Install DeepMath
+
+Create the project's virtual environment and install the standard dependencies:
 
 ```bash
-uv pip install -r requirements.txt
-uv pip install -e .
+uv sync
 ```
+
+`uv` will automatically create a `.venv` virtual environment, install the locked dependencies, and install DeepMath in editable mode.
+
+You can run commands directly in the project environment with `uv run`:
+
+```bash
+uv run python --version
+```
+
+Or activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+### GPU / CUDA Support
+
+DeepMath's GPU training and vLLM dependencies are optional because they require a supported GPU environment and are not available on all platforms.
+
+For an NVIDIA/CUDA environment, install the GPU dependencies with:
+
+```bash
+uv sync --extra gpu
+```
+
+The `gpu` extra includes dependencies such as vLLM, FlashAttention, DeepSpeed, and bitsandbytes.
+
+A standard `uv sync` is sufficient for development environments that do not require these GPU-specific features, including macOS.
 
 ## Usage
 
