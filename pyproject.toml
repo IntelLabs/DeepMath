@@ -32,6 +32,7 @@ dependencies = [
   "sympy==1.14.0",
   "submitit",
   "tiktoken==0.12.0",
+  "torch==2.10.0",
   "transformers==5.10.4",
   "trl==0.17.0",
   "requests==2.34.2",
@@ -45,17 +46,18 @@ Issues = "https://github.com/intellabs/DeepMath/issues"
 Documentation = "https://github.com/intellabs/DeepMath#readme"
 
 [project.optional-dependencies]
+# The pinned FlashAttention wheel targets Linux x86-64 and Python 3.12.
 gpu = [
-  "bitsandbytes>=0.45.3",
-  "deepspeed==0.16.7",
+  "bitsandbytes>=0.45.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "deepspeed==0.16.7; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "fastapi",
-  "flash-attn==2.8.3",
+  "flash-attn==2.8.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "pydantic",
   "torch==2.10.0",
   "torchaudio==2.10.0",
   "torchvision==0.25.0",
   "uvicorn",
-  "vllm==0.19.1",
+  "vllm==0.19.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [tool.uv.sources]
