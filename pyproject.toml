@@ -52,12 +52,16 @@ gpu = [
   "flash-attn==2.8.3",
   "pydantic",
   "torch==2.10.0",
+  "torchaudio==2.10.0",
+  "torchvision==0.25.0",
   "uvicorn",
   "vllm==0.19.1",
 ]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130" }
 flash-attn = { url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu13torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
 
 [[tool.uv.index]]
