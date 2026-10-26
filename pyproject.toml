@@ -53,7 +53,6 @@ gpu = [
   "fastapi",
   "flash-attn==2.8.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "pydantic",
-  "torch==2.10.0",
   "torchaudio==2.10.0",
   "torchvision==0.25.0",
   "uvicorn",
