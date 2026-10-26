@@ -9,11 +9,9 @@ Large language models (LLMs) have made impressive strides in reasoning tasks, ye
 
 ## DeepMath
 
-DeepMath is built on **Qwen3-4B Thinking** and fine-tuned with **GRPO (Group Relative Policy Optimization)**. Instead of verbose text, the model emits **tiny Python snippets** for intermediate steps, runs them in a secure sandbox, and folds the results back into its reasoning, reducing errors and output length.
+DeepMath is built on **Qwen3-4B Thinking** and fine-tuned with **GRPO (Group Relative Policy Optimization)**. Instead of verbose text, the model emits short math snippets in a restricted Python-like language. A bounded interpreter evaluates approved mathematical operations and folds the results back into its reasoning.
 
-✅ No file I/O, no network calls, strict timeouts.
-
-✅ Safe, deterministic, and auditable.
+The interpreter does not expose general Python imports, arbitrary file/network operations, or SymPy's string-expression evaluators. Its worker is **not an OS sandbox**: it runs with the service account's operating-system privileges unless deployment-level isolation is configured. The inference server also does not authenticate requests by default; do not expose it to untrusted networks without adding access controls and isolation.
 
 We evaluate DeepMath on four math datasets: **MATH500, AIME, HMMT, and HLE,** and show that:
 
@@ -33,16 +31,16 @@ Check out:
 
 LLMs often struggle with numeric precision and produce unnecessarily long reasoning chains. Two opportunities stand out:
 
-1. **Offload deterministic computation** to a safe executor.
+1. **Offload deterministic computation** to a restricted math executor.
 
 2. **Train models to prefer concise, computation-oriented traces** over verbose text.
 
-DeepMath implements both. The model learns to generate short Python snippets, which are executed in a sandbox and reintegrated into the context. GRPO fine-tuning encourages this behavior by rewarding correctness and encouraging shorter outputs.
+DeepMath implements both. The model learns to generate short math snippets, which are interpreted by a restricted math executor and reintegrated into the context. GRPO fine-tuning encourages this behavior by rewarding correctness and encouraging shorter outputs.
 
 ## How It Works
 
 - Base model: [Qwen3-4B Thinking](https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507).
-- Executor constraints: sandboxed environment, allow-list of imported modules, per-snippet timeout.
+- Executor constraints: restricted math syntax and fixed operation registry, bounded inputs/outputs and per-call worker deadline. This is not an OS sandbox; production deployments need OS-level isolation.
 - Inference: based on [SmolAgents](https://github.com/huggingface/smolagents/), a math agent was created. vLLM is used as the inference engine.
 - Training: based on the GRPO trainer in [TRL](https://github.com/huggingface/trl), we modified TRL's vLLM client and server to generate GRPO completions using our DeepMath agent.
 
@@ -52,15 +50,15 @@ DeepMath implements both. The model learns to generate short Python snippets, wh
 <em>Figure 1: The vLLM client and server were modified to use the DeepMath agent in generating the candidates, while using the vLLM backend.</em>
 
 
-- **Agent Interface:** During inference, the model can output normal tokens or special agent calls containing Python snippets.
+- **Agent Interface:** During inference, the model can output normal tokens or special agent calls containing restricted math snippets.
 
-- **Execution:** Snippets run in a sandboxed environment with strict safety constraints (no file I/O, no network, timeouts).
+- **Execution:** Snippets run in a restricted interpreter. The worker retains its service account's OS privileges; filesystem, network, credentials, and deployment isolation must be controlled outside the interpreter.
 
 - **Design Goals:**
 
   - **Concision:** Replace multi-line textual calculations with short, focused snippets.
 
-  - **Determinism & Safety:** Enforce strict execution limits.
+    - **Bounded computation:** Enforce interpreter-level source, operation, collection, output, and execution limits.
 
   - **Interpretability:** Snippets are readable and auditable.
 
@@ -108,7 +106,7 @@ We benchmarked DeepMath against baselines on four datasets. Metrics include:
 
 - **Efficiency:** Shorter outputs mean faster inference and easier interpretability.
 
-- **Safety:** Sandbox execution mitigates risks of running arbitrary code.
+  - **Safety:** Restrict the supported math language; use deployment-level OS isolation for defense in depth.
 
 ## Conclusion
 
@@ -116,31 +114,66 @@ DeepMath demonstrates a practical and lightweight way to combine a small executo
 
 ## Try It Yourself
 
-Check out the GitHub repo and share your feedback! Contributions welcome. 🚀
+Check out the GitHub repository and give DeepMath a try. Feedback and contributions are welcome. 🚀
 
 ## Installation
 
-DeepMath uses [uv](https://github.com/astral-sh/uv):
+DeepMath uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management.
 
-1. **Install uv** (if not already installed):
+### 1. Install uv
+
+If `uv` is not already installed:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-2. **Clone the repository**:
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/intellabs/DeepMath.git
 cd DeepMath
 ```
 
-3. **Install dependencies**:
+### 3. Install DeepMath
+
+Create the project's virtual environment and install the standard dependencies:
 
 ```bash
-uv pip install -r requirements.txt
-uv pip install -e .
+uv sync
 ```
+
+`uv` will automatically create a `.venv` virtual environment, install the locked dependencies, and install DeepMath in editable mode.
+
+You can run commands directly in the project environment with `uv run`:
+
+```bash
+uv run python --version
+```
+
+Or activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+### GPU / CUDA Support
+
+DeepMath's GPU training and vLLM dependencies are optional because they require a supported GPU environment and are not available on all platforms.
+
+For a Linux x86-64 NVIDIA/CUDA environment with Python 3.12, install the GPU dependencies with:
+
+```bash
+uv sync --extra gpu
+```
+
+The `gpu` extra includes dependencies such as vLLM, FlashAttention, DeepSpeed, and bitsandbytes.
+
+A standard `uv sync` is sufficient for development environments that do not require these GPU-specific features, including macOS.
+
+Standard development still installs PyTorch because the training libraries depend on it. On macOS, PyTorch comes from PyPI and does not require CUDA; CPU and supported Apple MPS operations remain available. The CUDA 13.0 PyTorch source and the pinned FlashAttention wheel are restricted to the Linux x86-64 `gpu` extra. This configuration does not guarantee a CPU-only PyTorch installation on Linux.
+
+`uv` resolves all extras when updating the lockfile, so GPU packages can appear in the lockfile without being installed by a standard macOS sync.
 
 ## Usage
 
@@ -251,4 +284,4 @@ If you use DeepMath in your research, please cite:
 
 - **Generalization**: evaluated on contest-style math; results may not transfer to open-ended mathematical creativity or formal proofs.
 
-- Executing generated code is inherently risky. DeepMath uses strict sandboxing and resource limits, but any deployment should carefully manage attack surfaces and enforce rate limits.
+- Generated snippets are interpreted by a restricted math executor, not run as arbitrary Python. The worker is not an OS sandbox and the server routes are unauthenticated by default; do not expose the service to untrusted networks. Production operators must add authentication, OS-level isolation, resource controls, and rate limits. See [restricted math execution](docs/math-execution.md).

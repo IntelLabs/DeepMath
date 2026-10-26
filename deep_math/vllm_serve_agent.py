@@ -329,24 +329,21 @@ def chunk_list(lst: list, n: int) -> list[list]:
 
 
 def main(script_args: ScriptArguments):
-    if not is_fastapi_available():
-        raise ImportError(
-            "FastAPI is required to run the vLLM serve script. Please install it using `pip install fastapi`."
+    missing = [
+        name
+        for name, available in (
+            ("FastAPI", is_fastapi_available()),
+            ("Pydantic", is_pydantic_available()),
+            ("Uvicorn", is_uvicorn_available()),
+            ("vLLM", is_vllm_available()),
         )
+        if not available
+    ]
 
-    if not is_pydantic_available():
+    if missing:
         raise ImportError(
-            "Pydantic is required to run the vLLM serve script. Please install it using `pip install pydantic`."
-        )
-
-    if not is_uvicorn_available():
-        raise ImportError(
-            "Uvicorn is required to run the vLLM serve script. Please install it using `pip install uvicorn`."
-        )
-
-    if not is_vllm_available():
-        raise ImportError(
-            "vLLM is required to run the vLLM serve script. Please install it using `pip install vllm`."
+            f"Missing GPU/vLLM dependencies: {', '.join(missing)}. "
+            "Install them with `uv sync --extra gpu`."
         )
 
     if is_vllm_available():

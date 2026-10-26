@@ -1,9 +1,4 @@
-import multiprocessing as mp
-import pickle
-import re
-import threading
 import time
-import traceback
 from collections.abc import Generator
 from dataclasses import dataclass
 from enum import IntEnum
@@ -18,20 +13,24 @@ from smolagents import (
     ChatMessage,
     CodeAgent,
     FinalAnswerStep,
-    Message,
     MessageRole,
     Model,
     PlanningStep,
     Tool,
     VLLMModel,
-    fix_final_answer_code,
     handle_agent_output_types,
-    parse_code_blobs,
     truncate_content,
 )
 from smolagents.memory import MemoryStep
+from smolagents.monitoring import Timing
 from transformers.generation import StoppingCriteriaList, StopStringCriteria
 from vllm import SamplingParams
+
+from deep_math.math_executor import (
+    RestrictedMathExecutor,
+    extract_math_code,
+    validate_model_output,
+)
 
 
 class LogLevel(IntEnum):
@@ -42,94 +41,6 @@ class LogLevel(IntEnum):
 
 
 YELLOW_HEX = "#d4b702"
-
-
-class CodeExecutionTimeout:
-    """Run a callable with a hard timeout using a separate process.
-
-    If the callable and its arguments are picklable, the callable is executed in
-    a child process which is terminated on timeout (strong enforcement).
-
-    If pickling fails (common for bound methods / complex objects), we fall
-    back to a thread-based wait that raises TimeoutError but cannot kill the
-    background thread; this preserves previous behavior but is not a hard kill.
-    """
-
-    def __init__(self, timeout_seconds: int = 30):
-        self.timeout_seconds = timeout_seconds
-        self.result = None
-        self.exception = None
-        self.completed = threading.Event()
-
-    @staticmethod
-    def _process_wrapper(queue: "mp.Queue", func, args, kwargs):
-        try:
-            res = func(*args, **kwargs)
-            queue.put(("OK", res))
-        except Exception:
-            tb = traceback.format_exc()
-            queue.put(("EXC", tb))
-
-    def run_with_timeout(self, func, *args, **kwargs):
-        """Run `func(*args, **kwargs)` with hard timeout enforcement where possible.
-
-        Returns whatever the callable returns. Raises TimeoutError on timeout.
-        Reraises exceptions from the callable (wrapped from subprocess traceback
-        into a RuntimeError) when running in a subprocess.
-        """
-        # First attempt: run in a subprocess so we can terminate it on timeout.
-        try:
-            # Validate picklability early to provide clearer fallback behavior
-            pickle.dumps((func, args, kwargs))
-
-            q: "mp.Queue" = mp.Queue()
-            p = mp.Process(target=self._process_wrapper, args=(q, func, args, kwargs), daemon=True)
-            p.start()
-            p.join(self.timeout_seconds)
-            if p.is_alive():
-                p.terminate()
-                p.join(1.0)
-                if p.is_alive():
-                    p.kill()
-                    p.join()
-                raise RuntimeError(f"Code execution timed out after {self.timeout_seconds} seconds")
-
-            if not q.empty():
-                tag, payload = q.get()
-                if tag == "OK":
-                    return payload
-                else:
-                    # Exception occurred in subprocess; present traceback
-                    raise RuntimeError(f"Exception in subprocess:\n{payload}")
-            else:
-                raise RuntimeError("Worker process exited without returning a result.")
-
-        except (pickle.PicklingError, AttributeError, TypeError) as e:
-            # Fallback: not picklable — run in a thread and wait (cannot kill thread)
-            # Preserve previous behavior: start thread, wait, raise TimeoutError on timeout
-            thread_exc = None
-
-            def _target_wrapper(func, args, kwargs):
-                nonlocal thread_exc
-                try:
-                    self.result = func(*args, **kwargs)
-                except Exception as ex:
-                    thread_exc = ex
-                finally:
-                    self.completed.set()
-
-            thread = threading.Thread(
-                target=_target_wrapper, args=(func, args, kwargs), daemon=True
-            )
-            thread.start()
-
-            if self.completed.wait(timeout=self.timeout_seconds):
-                if thread_exc:
-                    raise thread_exc
-                return self.result
-            else:
-                # We cannot forcefully terminate the thread — raise to caller
-                raise RuntimeError(f"Code execution timed out after {self.timeout_seconds} seconds")
 
 
 def substring_stopping_criteria(
@@ -234,7 +145,7 @@ class QueryWithInstructionsStep(MemoryStep):
 
     prompt: str
 
-    def to_messages(self, summary_mode: bool = False) -> list[Message]:
+    def to_messages(self, summary_mode: bool = False) -> list[str]:
         return [self.prompt]
 
 
@@ -255,34 +166,36 @@ class MathAgent(CodeAgent):
         planning_interval: int | None = None,
         stream_outputs: bool = False,
         code_execution_timeout: int = 20,  # Timeout in seconds for Python code execution
-        additional_authorized_imports: list[str] = [
-            "cmath",
-            "numpy",
-            "numpy.*",
-            "scipy",
-            "scipy.*",
-            "sympy",
-            "sympy.*",
-        ],
+        additional_authorized_imports: list[str] | None = None,
         **kwargs,
     ):
         # NOTE!: we now assume the "task" is a complete processed chat template, maybe including system instruction
 
+        if tools or additional_authorized_imports or kwargs.get("managed_agents"):
+            raise ValueError("MathAgent uses a fixed math policy; extra tools/imports are disabled")
+        if any(key in kwargs for key in ("executor", "executor_type", "executor_kwargs")):
+            raise ValueError("MathAgent's restricted executor cannot be overridden")
+        if kwargs.get("add_base_tools"):
+            raise ValueError("Additional base tools are disabled for MathAgent")
         self.code_execution_timeout = code_execution_timeout
+        self.grammar = grammar
 
         super().__init__(
             tools=tools,
             model=model,
             max_steps=max_steps,
-            grammar=grammar,
             planning_interval=planning_interval,
             stream_outputs=stream_outputs,
-            additional_authorized_imports=additional_authorized_imports,
+            additional_authorized_imports=[],
             **kwargs,
         )
+        self.authorized_imports = ["sympy", "numpy"]
 
         self._max_agent_output = max_agent_output
         self._output_tokens = 0  # we'll manage total output tokens per run as a global constraint instead of #steps x vllm_step_max_length
+
+    def create_python_executor(self):
+        return RestrictedMathExecutor(self.code_execution_timeout)
 
     def initialize_system_prompt(self) -> str:
         return ""
@@ -326,9 +239,13 @@ class MathAgent(CodeAgent):
                 If `False`, executes all steps internally and returns only the final answer after completion.
             reset (`bool`): Whether to reset the conversation or keep it going from previous run.
             images (`list[PIL.Image.Image]`, *optional*): Image(s) objects.
-            additional_args (`dict`, *optional*): Any other variables that you want to pass to the agent run, for instance images or dataframes. Give them clear names!
+            additional_args (`dict`, *optional*): Nonempty injected arguments are prohibited by the math execution policy.
             max_steps (`int`, *optional*): Maximum number of steps the agent can take to solve the task. if not provided, will use the agent's default value.
         """
+        # Conversation memory may be retained, but execution state never crosses tasks.
+        self.python_executor.reset()
+        if additional_args:
+            raise ValueError("Host objects cannot be injected into restricted math execution")
         max_steps = max_steps or self.max_steps
         self.task = task
         self.sampling_params = (
@@ -338,11 +255,6 @@ class MathAgent(CodeAgent):
         self._typical_step = self.sampling_params.max_tokens if self.sampling_params else 512
 
         self.interrupt_switch = False
-        if additional_args is not None:
-            self.state.update(additional_args)
-            self.task += f"""
-You have been provided with these additional arguments, that you can access using the keys as variables in your python code:
-{str(additional_args)}."""
 
         self.memory.system_prompt = QueryWithInstructionsStep(prompt=self.task)
         if reset:
@@ -356,17 +268,18 @@ You have been provided with these additional arguments, that you can access usin
             title=self.name if hasattr(self, "name") else None,
         )
 
-        if getattr(self, "python_executor", None):
-            self.python_executor.send_variables(variables=self.state)
-            self.python_executor.send_tools({**self.tools, **self.managed_agents})
-
+        steps = self._run_with_math_cleanup(task=self.task, max_steps=max_steps, images=images)
         if stream:
             # The steps are returned as they are executed through a generator to iterate on.
-            return self._run_stream(task=self.task, max_steps=max_steps, images=images)
+            return steps
         # Outputs are returned only at the end. We only look at the last step.
-        return list(self._run_stream(task=self.task, max_steps=max_steps, images=images))[
-            -1
-        ].final_answer
+        return list(steps)[-1].output
+
+    def _run_with_math_cleanup(self, **kwargs):
+        try:
+            yield from self._run_stream(**kwargs)
+        finally:
+            self.python_executor.close()
 
     def _run_stream(
         self, task: str, max_steps: int, images: list["PIL.Image.Image"] | None = None
@@ -386,7 +299,9 @@ You have been provided with these additional arguments, that you can access usin
                     yield element
                 self.memory.steps.append(element)
             action_step = ActionStep(
-                step_number=self.step_number, start_time=step_start_time, observations_images=images
+                step_number=self.step_number,
+                timing=Timing(start_time=step_start_time),
+                observations_images=images,
             )
             try:
                 for el in self._execute_step(action_step):
@@ -398,11 +313,13 @@ You have been provided with these additional arguments, that you can access usin
             except AgentError as e:
                 # Other AgentError types are caused by the Model, so we should log them and iterate.
                 action_step.error = e
+                action_step.is_final_answer = False
+                final_answer = None
             finally:
-                self._finalize_step(action_step, step_start_time)
+                self._finalize_step(action_step)
                 self.memory.steps.append(action_step)
-                yield FinalAnswerStep(handle_agent_output_types(self.collect_all_outputs()))
                 self.step_number += 1
+            yield action_step
 
         yield FinalAnswerStep(handle_agent_output_types(self.collect_all_outputs()))
 
@@ -472,6 +389,7 @@ You have been provided with these additional arguments, that you can access usin
                     title="Output message of the LLM:",
                     level=LogLevel.DEBUG,
                 )
+                validate_model_output(output_text)
                 model_output = output_text
 
                 chat_message = ChatMessage(role="assistant", content=model_output)
@@ -490,6 +408,7 @@ You have been provided with these additional arguments, that you can access usin
                     sampling_params=self.sampling_params,
                     **additional_args,
                 )
+                validate_model_output(chat_message.content)
                 memory_step.model_output_message = chat_message
                 model_output = chat_message.content
                 self.logger.log_markdown(
@@ -535,30 +454,18 @@ You have been provided with these additional arguments, that you can access usin
             if self.sampling_params.max_tokens < 50:
                 out_of_tokens = True
 
-        # Replace <tool_call>...</tool_call> with ```python...\n```
-        if model_output is not None:
-            model_output_to_md = re.sub(
-                r"<tool_call>(.*?)</tool_call>",
-                r"```python\n\1\n```\n",
-                model_output,
-                flags=re.DOTALL,
-            )
-
-            correct_mode_output = re.sub(
-                r"```python\n(.*?)\n```",
-                r"<tool_call>\n\1\n</tool_call>\n",
-                model_output,
-                flags=re.DOTALL,
-            )
-            if correct_mode_output != memory_step.model_output:
-                memory_step.model_output = correct_mode_output
-
         try:
-            code_action = fix_final_answer_code(parse_code_blobs(model_output_to_md))
+            code_action = extract_math_code(model_output)
         except Exception as e:
+            self.python_executor.reset()
+            memory_step.observations = f"Exception: {e} (task state discarded)"
+            yield out_of_tokens
+            return
+        if code_action is None:
             self.logger.log("NO CODE REQUESTS THIS STEP", level=LogLevel.INFO)
             yield out_of_tokens
             return
+        memory_step.code_action = code_action
 
         ### Execute action ###
         self.logger.log_code(
@@ -567,9 +474,11 @@ You have been provided with these additional arguments, that you can access usin
         is_final_answer = False
         try:
             execution_outputs_console = []
-            timeout_manager = CodeExecutionTimeout(self.code_execution_timeout)
-            output, execution_logs, is_final_answer = timeout_manager.run_with_timeout(
-                self.python_executor, code_action
+            result = self.python_executor(code_action)
+            output, execution_logs, is_final_answer = (
+                result.output,
+                result.logs,
+                result.is_final_answer,
             )
             if len(execution_logs) > 0:
                 execution_outputs_console += [
@@ -580,28 +489,7 @@ You have been provided with these additional arguments, that you can access usin
 
         except Exception as e:
             output = ""
-            execution_logs = ""
-            if (
-                hasattr(self.python_executor, "state")
-                and "_print_outputs" in self.python_executor.state
-            ):
-                execution_logs = str(self.python_executor.state["_print_outputs"])
-                if len(execution_logs) > 0:
-                    execution_outputs_console = [
-                        Text("Execution logs:", style="bold"),
-                        Text(execution_logs),
-                    ]
-                    self.logger.log(Group(*execution_outputs_console), level=LogLevel.INFO)
-
-            error_msg = str(e)
-            if execution_logs == "":
-                execution_logs = f"Exception: {error_msg}"
-
-            if "Import of " in error_msg and " is not allowed" in error_msg:
-                self.logger.log(
-                    "[bold red]Warning to user: Code execution failed due to an unauthorized import - Consider passing said import under `additional_authorized_imports` when initializing your CodeAgent.",
-                    level=LogLevel.INFO,
-                )
+            execution_logs = f"Exception: {e}"
 
         truncated_output = truncate_content(str(output))
         execution_logs = truncate_content(execution_logs, max_length=500)
@@ -617,5 +505,6 @@ You have been provided with these additional arguments, that you can access usin
         ]
         self.logger.log(Group(*execution_outputs_console), level=LogLevel.INFO)
         memory_step.action_output = output
+        memory_step.is_final_answer = is_final_answer
 
-        yield out_of_tokens
+        yield output if is_final_answer else out_of_tokens

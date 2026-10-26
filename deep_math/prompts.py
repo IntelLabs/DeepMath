@@ -30,8 +30,13 @@ In your solution you MUST strictly follow these instructions:
 </tool_call>
 
 * Use only variables that you have defined!
-* You can use imports in your code, but only from the following list of modules: cmath, numpy, scipy, math, random, sympy, statistics.
-* Use numpy in your code as much as possible as it's very efficient.
+* Code uses a restricted math subset, NOT arbitrary Python. Imports are aliases into a fixed capability list, not real modules.
+* From sympy you may use symbols, Symbol, Rational, Eq, Abs, solve, exp, sqrt, I, pi; from numpy only argmin.
+* Supported expression methods: subs and as_real_imag. Built-ins: range, print, abs, len, final_answer.
+* Use assignments, arithmetic, lists/tuples/dicts, indexing, bounded for loops and single list comprehensions. Use ** for powers. No functions, classes, arbitrary attributes, callbacks, keyword arguments or other imports.
+* Declare symbols with simple ASCII names, e.g. symbols('x y'). All other math arguments must be numbers or typed symbolic expressions, never expression strings. Rational takes two integers; solve takes equations and symbols.
+* Variables persist between successful tool calls within this question. Any error or timeout clears all variables, so redefine them before retrying. Variables never persist between questions.
+* Keep computations and output small; excessive source, nesting, iterations, exponents, symbolic complexity and output are rejected.
 * An `output` block will be inserted with the code evaluation results; don't add it yourself.
 * Use the results in your reasoning, no need to repeat them.
 * Never say that you don't know, always try to solve the problem!
